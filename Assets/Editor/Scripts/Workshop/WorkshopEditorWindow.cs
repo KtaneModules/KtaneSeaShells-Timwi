@@ -3,10 +3,13 @@ using Steamworks;
 using UnityEngine;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Collections.Generic;
 
 public class WorkshopEditorWindow : EditorWindow
 {
+    private Vector2 scrollPosition;
+
     protected static readonly AppId_t KTANE_APP_ID = new AppId_t(341800);
     protected static readonly AppId_t EDITOR_APP_ID = new AppId_t(341800); //For now, the same AppID
 
@@ -32,7 +35,7 @@ public class WorkshopEditorWindow : EditorWindow
         Debug.LogWarning(pchDebugText);
     }
 
-    [MenuItem("Keep Talking ModKit/Steam Workshop Tool", priority = 20)]
+    [MenuItem("Keep Talking ModKit/Steam Workshop Tool _#F5", priority = 20)]
     protected static void ShowWindow()
     {
         WorkshopEditorWindow window = EditorWindow.GetWindow<WorkshopEditorWindow>("Workshop");
@@ -85,6 +88,7 @@ public class WorkshopEditorWindow : EditorWindow
                 }
             }
 
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             workshopItemEditor.OnInspectorGUI();
 
             //Publishing Tools
@@ -93,13 +97,15 @@ public class WorkshopEditorWindow : EditorWindow
             GUI.backgroundColor = new Color(0.1f, 0.1f, 0.5f, 0.7f);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = oldBGColor;
+            
+            string folder = GetContentPath();
 
             EditorGUILayout.LabelField("Publishing Tools", EditorStyles.largeLabel);
             EditorGUILayout.Separator();
             EditorGUILayout.LabelField("User:", userName);
-            EditorGUILayout.LabelField("Content Folder:", GetContentPath());
+            EditorGUILayout.LabelField("Content Folder:", folder);
 
-            DirectoryInfo dir = new DirectoryInfo(GetContentPath());
+            DirectoryInfo dir = new DirectoryInfo(folder);
 
             if (dir.Exists)
             {
@@ -136,6 +142,11 @@ public class WorkshopEditorWindow : EditorWindow
             {
                 EditorGUILayout.HelpBox("Change notes must be entered before publishing to Workshop", MessageType.Warning);
             }
+            
+            if(dir.GetFiles("modInfo_Harmony.json").Length > 0)
+			{
+				EditorGUILayout.HelpBox("Your mod uses the Harmony library. This means it won't work without the Tweaks mod, so on the Workshop, please either add Tweaks as a dependency or mention it in the description!", MessageType.Warning);
+			}
 
 
             //Publishing changes
@@ -159,7 +170,7 @@ public class WorkshopEditorWindow : EditorWindow
                 {
                     PublishWorkshopChanges();
                 }
-
+				
                 if (!string.IsNullOrEmpty(ugcUpdateStatus))
                 {
                     EditorGUILayout.LabelField(ugcUpdateStatus);
@@ -167,7 +178,9 @@ public class WorkshopEditorWindow : EditorWindow
 
                 GUI.enabled = true;
             }
+            
             EditorGUILayout.EndVertical();
+            EditorGUILayout.EndScrollView();
         }
     }
 
@@ -196,7 +209,7 @@ public class WorkshopEditorWindow : EditorWindow
         ugcUpdateHandle = SteamUGC.StartItemUpdate(KTANE_APP_ID, new PublishedFileId_t(currentWorkshopItem.WorkshopPublishedFileID));
 
         SteamUGC.SetItemTitle(ugcUpdateHandle, currentWorkshopItem.Title);
-        SteamUGC.SetItemDescription(ugcUpdateHandle, currentWorkshopItem.Description);
+        SteamUGC.SetItemDescription(ugcUpdateHandle, ModConfig.Description);
 
         string[] tags = GetTags();
         if (tags != null && tags.Length > 0)
@@ -204,9 +217,9 @@ public class WorkshopEditorWindow : EditorWindow
             SteamUGC.SetItemTags(ugcUpdateHandle, GetTags());
         }
 
-        if (currentWorkshopItem.PreviewImage != null)
+        if (ModConfig.PreviewImage != null)
         {
-            string previewImagePath = AssetDatabase.GetAssetPath(currentWorkshopItem.PreviewImage);
+            string previewImagePath = AssetDatabase.GetAssetPath(ModConfig.PreviewImage);
             previewImagePath = Path.GetFullPath(previewImagePath);
             Debug.LogFormat("Setting preview image path to: {0}", previewImagePath);
             SteamUGC.SetItemPreview(ugcUpdateHandle, previewImagePath);
@@ -322,6 +335,8 @@ public class WorkshopEditorWindow : EditorWindow
         if (result.m_eResult == EResult.k_EResultOK)
         {
             currentWorkshopItem.WorkshopPublishedFileID = result.m_nPublishedFileId.m_PublishedFileId;
+            AssetDatabase.SaveAssets();
+
             PublishWorkshopChanges();
         }
     }
