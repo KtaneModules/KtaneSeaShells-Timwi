@@ -48,3 +48,8 @@ Temporary Items
 
 /[Ll]ibrary/
 /[Tt]emp/
+/[Bb]uild/
+/.vs/
+/.vscode/
+/bin/
+/obj/
